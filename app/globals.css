@@ -1,8 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0d1117;
+  --foreground: #e6edf3;
+  --accent: #f97316;
+  --accent-dim: rgba(249,115,22,0.15);
+  --border: rgba(255,255,255,0.08);
+  --card: #161b22;
+  --card-hover: #1c2330;
 }
 
 @theme inline {
@@ -12,15 +17,30 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* 科技感滚动条 */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(249,115,22,0.3); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(249,115,22,0.6); }
+
+/* 发光边框动画 */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(249,115,22,0.3); }
+  50% { box-shadow: 0 0 20px rgba(249,115,22,0.6); }
+}
+
+.glow { animation: glow-pulse 2s ease-in-out infinite; }
+
+/* 数字跳动 */
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.count-up { animation: count-up 0.4s ease-out; }
+
