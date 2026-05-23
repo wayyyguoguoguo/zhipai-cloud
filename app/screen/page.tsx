@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import { Activity, AlertTriangle, TrendingUp, Package, Clock, Zap } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
-const PRODUCT_LINES = ['上轴', '下轴', '抬牙轴', '送布轴', '压杆', '针杆', '小产品']
+const PRODUCT_LINES = ['上轴', '下轴', '抬牙轴', '送料轴', '压杆', '针杆', '小产品']
 
 const STAGE_GROUPS: Record<number, string> = {
   1: '原料入库', 2: '五金加工', 3: '五金加工',
