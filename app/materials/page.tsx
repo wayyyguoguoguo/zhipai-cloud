@@ -380,6 +380,18 @@ export default function MaterialsPage() {
   async function handleStatusChange(batchId: string, newStatus: string) {
     await supabase.from('material_batches').update({ inbound_status: newStatus }).eq('id', batchId)
     setBatches(prev => prev.map(b => b.id === batchId ? { ...b, inbound_status: newStatus } : b))
+
+    // 原料已入库 → 关联订单进入生产中
+    if (newStatus === 'inbound') {
+      const batch = batches.find(b => b.id === batchId)
+      if (batch?.order_id) {
+        await supabase
+          .from('orders')
+          .update({ status: 'in_production' })
+          .eq('id', batch.order_id)
+          .eq('status', 'pending')
+      }
+    }
   }
 
   return (

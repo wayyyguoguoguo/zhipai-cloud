@@ -2,8 +2,8 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { cn, STAGE_NAMES } from '@/lib/utils'
-import { CheckCircle2, Clock, AlertTriangle, Package, ArrowLeft } from 'lucide-react'
+import { cn, STAGE_NAMES, STATUS_LABELS } from '@/lib/utils'
+import { CheckCircle2, Clock, AlertTriangle, Package, ArrowLeft, Search } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 type Order = {
@@ -44,9 +44,41 @@ const WEIGH_LABELS: Record<number, string> = {
 }
 const LOSS_LABELS = ['五金加工损耗', '热处理损耗', '磨床损耗', '校直检验损耗']
 
+type OrderListItem = {
+  id: string
+  order_no: string
+  customer_name: string
+  product_model: string
+  quantity: number
+  status: string
+  is_urgent: boolean
+  delivery_date: string
+  order_progress: { current_stage: number }[] | null
+}
+
 function TrackingContent() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('id')
+
+  // ── 无 id：显示在产订单列表 ──────────────────────────────────────
+  const [orderList, setOrderList] = useState<OrderListItem[]>([])
+  const [listLoading, setListLoading] = useState(false)
+  const [listSearch, setListSearch] = useState('')
+
+  useEffect(() => {
+    if (orderId) return
+    setListLoading(true)
+    supabase
+      .from('orders')
+      .select('id, order_no, customer_name, product_model, quantity, status, is_urgent, delivery_date, order_progress(current_stage)')
+      .in('status', ['pending', 'in_production'])
+      .order('is_urgent', { ascending: false })
+      .order('delivery_date', { ascending: true })
+      .then(({ data }) => {
+        setOrderList(data ?? [])
+        setListLoading(false)
+      })
+  }, [orderId])
 
   const [order, setOrder] = useState<Order | null>(null)
   const [progress, setProgress] = useState<OrderProgress | null>(null)
@@ -55,7 +87,7 @@ function TrackingContent() {
   const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
-    if (!orderId) { setNotFound(true); setLoading(false); return }
+    if (!orderId) return
     fetchData()
 
     const channel = supabase.channel(`tracking-${orderId}`)
@@ -87,6 +119,80 @@ function TrackingContent() {
     setLoading(false)
   }
 
+  // ── 无 id：渲染订单列表 ──────────────────────────────────────────
+  if (!orderId) {
+    const filtered = orderList.filter(o =>
+      !listSearch ||
+      o.order_no.toLowerCase().includes(listSearch.toLowerCase()) ||
+      o.customer_name.toLowerCase().includes(listSearch.toLowerCase()) ||
+      o.product_model.toLowerCase().includes(listSearch.toLowerCase())
+    )
+    return (
+      <div className="p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-100">生产追踪</h1>
+            <p className="text-sm text-slate-500 mt-0.5">选择订单查看实时进度</p>
+          </div>
+          <div className="relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
+            <input
+              value={listSearch}
+              onChange={e => setListSearch(e.target.value)}
+              placeholder="搜索订单号 / 客户 / 型号"
+              className="pl-8 pr-3 py-2 text-xs bg-[#161b22] border border-white/8 rounded-lg text-slate-300 placeholder-slate-600 focus:outline-none focus:border-orange-500/40 w-56"
+            />
+          </div>
+        </div>
+
+        {listLoading ? (
+          <div className="flex items-center justify-center h-40 text-slate-600 text-sm">加载中...</div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-40 gap-2 text-slate-600 text-sm">
+            <Package size={24} className="opacity-30" />
+            {listSearch ? '没有匹配的订单' : '暂无在产订单'}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filtered.map(o => {
+              const stage = o.order_progress?.[0]?.current_stage ?? 0
+              const daysLeft = Math.ceil((new Date(o.delivery_date).getTime() - Date.now()) / 86400000)
+              const s = STATUS_LABELS[o.status] ?? { label: o.status, color: 'text-slate-400 bg-slate-400/10' }
+              return (
+                <a
+                  key={o.id}
+                  href={`/tracking?id=${o.id}`}
+                  className="flex items-center gap-4 bg-[#161b22] hover:bg-[#1c2128] border border-white/5 hover:border-orange-500/20 rounded-xl p-4 transition-all group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-mono text-slate-200">{o.order_no}</span>
+                      {o.is_urgent && (
+                        <span className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded-full">加急</span>
+                      )}
+                      <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full', s.color)}>{s.label}</span>
+                    </div>
+                    <div className="text-xs text-slate-500">{o.customer_name} · {o.product_model} · {o.quantity.toLocaleString()} 根</div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-xs text-slate-400 mb-1">工序 {stage}/14</div>
+                    <div className={cn(
+                      'text-xs',
+                      daysLeft <= 0 ? 'text-red-400' : daysLeft <= 3 ? 'text-yellow-400' : 'text-slate-600'
+                    )}>
+                      {daysLeft > 0 ? `剩 ${daysLeft} 天` : daysLeft === 0 ? '今日交货' : `逾期 ${-daysLeft} 天`}
+                    </div>
+                  </div>
+                  <div className="w-4 h-4 text-slate-700 group-hover:text-orange-400 transition-colors">›</div>
+                </a>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64 text-slate-600 text-sm">加载中...</div>
@@ -97,8 +203,8 @@ function TrackingContent() {
     return (
       <div className="p-6 flex flex-col items-center justify-center h-64 gap-4">
         <p className="text-slate-500 text-sm">订单不存在或已删除</p>
-        <a href="/orders" className="flex items-center gap-1.5 text-xs text-orange-400 hover:text-orange-300">
-          <ArrowLeft size={12} /> 返回订单列表
+        <a href="/tracking" className="flex items-center gap-1.5 text-xs text-orange-400 hover:text-orange-300">
+          <ArrowLeft size={12} /> 返回追踪列表
         </a>
       </div>
     )

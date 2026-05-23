@@ -80,7 +80,7 @@ export default function WorkerPage() {
       .from('orders')
       .select('id, order_no, product_model, customer_name, is_urgent')
       .in('id', orderIds)
-      .eq('status', 'in_production')
+      .in('status', ['pending', 'in_production'])
 
     if (!orders) { setBatches([]); setLoadingBatches(false); return }
 
