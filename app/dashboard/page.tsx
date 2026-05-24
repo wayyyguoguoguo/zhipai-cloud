@@ -18,7 +18,7 @@ type Order = {
   status: string
   is_urgent: boolean
   created_at: string
-  order_progress: { current_stage: number } | null
+  order_progress: { current_stage: number }[] | null
 }
 
 type Anomaly = {
@@ -79,7 +79,7 @@ export default function DashboardPage() {
 
   const stageCounts = STAGE_DISPLAY.map(name => ({
     stage: name,
-    count: inProduction.filter(o => STAGE_GROUPS[o.order_progress?.current_stage ?? 0] === name).length,
+    count: inProduction.filter(o => STAGE_GROUPS[o.order_progress?.[0]?.current_stage ?? 0] === name).length,
   }))
   const maxCount = Math.max(...stageCounts.map(s => s.count), 1)
 
@@ -242,11 +242,11 @@ export default function DashboardPage() {
                             {Array.from({ length: 14 }).map((_, j) => (
                               <div key={j} className={cn(
                                 'w-1 h-3 rounded-sm',
-                                j < (o.order_progress?.current_stage ?? 0) ? 'bg-orange-400' : 'bg-white/10'
+                                j < (o.order_progress?.[0]?.current_stage ?? 0) ? 'bg-orange-400' : 'bg-white/10'
                               )} />
                             ))}
                           </div>
-                          <span className="text-slate-500 ml-1">{o.order_progress?.current_stage ?? 0}/14</span>
+                          <span className="text-slate-500 ml-1">{o.order_progress?.[0]?.current_stage ?? 0}/14</span>
                         </div>
                       </td>
                       <td className="py-2.5 text-center">

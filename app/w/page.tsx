@@ -21,6 +21,36 @@ const ROLE_SCAN_INDEXES: Record<string, number[]> = {
 }
 
 const WEIGH_INDEXES = new Set([1, 4, 7, 10, 13])
+// 收料：工人接收上一工序产出
+const RECEIVE_INDEXES = new Set([2, 5, 8])
+// 完成：工人完成本工序，无需称重
+const COMPLETE_INDEXES = new Set([3, 6, 9, 11, 12])
+// 出库
+const SHIP_INDEXES = new Set([14])
+
+function getStepColor(scanIndex: number): { bg: string; text: string; border: string; badge: string } {
+  if (WEIGH_INDEXES.has(scanIndex)) return {
+    bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30', badge: 'bg-orange-500/20 text-orange-300'
+  }
+  if (RECEIVE_INDEXES.has(scanIndex)) return {
+    bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', badge: 'bg-blue-500/20 text-blue-300'
+  }
+  if (COMPLETE_INDEXES.has(scanIndex)) return {
+    bg: 'bg-green-500/10', text: 'text-green-400', border: 'border-green-500/30', badge: 'bg-green-500/20 text-green-300'
+  }
+  if (SHIP_INDEXES.has(scanIndex)) return {
+    bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30', badge: 'bg-purple-500/20 text-purple-300'
+  }
+  return { bg: 'bg-[#161b22]', text: 'text-slate-300', border: 'border-white/5', badge: 'bg-slate-500/20 text-slate-300' }
+}
+
+function getStepTypeLabel(scanIndex: number): string {
+  if (WEIGH_INDEXES.has(scanIndex)) return '称重'
+  if (RECEIVE_INDEXES.has(scanIndex)) return '收料'
+  if (COMPLETE_INDEXES.has(scanIndex)) return '完成'
+  if (SHIP_INDEXES.has(scanIndex)) return '出库'
+  return '操作'
+}
 
 type PendingBatch = {
   order_id: string
@@ -358,34 +388,41 @@ export default function WorkerPage() {
                 </button>
               </div>
             ) : (
-              batches.map((b, idx) => (
-                <button key={`${b.order_id}-${idx}`}
-                  onClick={() => handleSelect(b)}
-                  className={cn(
-                    'w-full text-left rounded-2xl border p-4 transition-all active:scale-98',
-                    b.is_urgent
-                      ? 'bg-red-500/8 border-red-500/30'
-                      : 'bg-[#161b22] border-white/5 hover:border-orange-500/30'
-                  )}>
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      {b.is_urgent && (
-                        <span className="text-xs text-red-400 font-medium">● 加急</span>
-                      )}
-                      <span className="text-xs text-slate-500 font-mono">
-                        {b.batch_no ?? b.order_no}
-                      </span>
+              batches.map((b, idx) => {
+                const stepColor = getStepColor(b.next_scan_index)
+                const typeLabel = getStepTypeLabel(b.next_scan_index)
+                return (
+                  <button key={`${b.order_id}-${idx}`}
+                    onClick={() => handleSelect(b)}
+                    className={cn(
+                      'w-full text-left rounded-2xl border p-4 transition-all active:scale-98',
+                      b.is_urgent
+                        ? 'bg-red-500/8 border-red-500/30'
+                        : `bg-[#161b22] ${stepColor.border} hover:opacity-90`
+                    )}>
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {b.is_urgent && (
+                          <span className="text-xs text-red-400 font-medium">● 加急</span>
+                        )}
+                        <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', stepColor.badge)}>
+                          {typeLabel}
+                        </span>
+                        <span className="text-xs text-slate-500 font-mono">
+                          {b.batch_no ?? b.order_no}
+                        </span>
+                      </div>
+                      <ChevronRight size={14} className="text-slate-600 mt-0.5 shrink-0" />
                     </div>
-                    <ChevronRight size={14} className="text-slate-600 mt-0.5 shrink-0" />
-                  </div>
-                  <div className="text-sm font-medium text-slate-200 mb-1.5">
-                    {b.product_model} · {b.customer_name}
-                  </div>
-                  <div className="text-xs text-orange-400">
-                    第 {b.next_scan_index} 步：{STAGE_NAMES[b.next_scan_index]}
-                  </div>
-                </button>
-              ))
+                    <div className="text-sm font-medium text-slate-200 mb-1.5">
+                      {b.product_model} · {b.customer_name}
+                    </div>
+                    <div className={cn('text-xs', stepColor.text)}>
+                      第 {b.next_scan_index} 步：{STAGE_NAMES[b.next_scan_index]}
+                    </div>
+                  </button>
+                )
+              })
             )}
           </div>
         )}
@@ -393,39 +430,43 @@ export default function WorkerPage() {
         {/* 确认操作 */}
         {step === 'confirm' && selected && (
           <div className="space-y-4">
-            <div className={cn(
-              'rounded-2xl border p-5',
-              selected.is_urgent ? 'bg-red-500/8 border-red-500/30' : 'bg-[#161b22] border-white/5'
-            )}>
-              {selected.is_urgent && (
-                <div className="flex items-center gap-1.5 text-red-400 text-xs font-medium mb-3">
-                  <AlertCircle size={12} />
-                  加急订单
+            {(() => {
+              const stepColor = getStepColor(selected.next_scan_index)
+              const typeLabel = getStepTypeLabel(selected.next_scan_index)
+              return (
+                <div className={cn(
+                  'rounded-2xl border p-5',
+                  selected.is_urgent ? 'bg-red-500/8 border-red-500/30' : `${stepColor.bg} ${stepColor.border}`
+                )}>
+                  {selected.is_urgent && (
+                    <div className="flex items-center gap-1.5 text-red-400 text-xs font-medium mb-3">
+                      <AlertCircle size={12} />
+                      加急订单
+                    </div>
+                  )}
+                  <div className="space-y-2.5 text-sm">
+                    {[
+                      ['订单号', selected.order_no, ''],
+                      ['产品', `${selected.product_model} · ${selected.customer_name}`, ''],
+                      ['当前工序', `第 ${selected.next_scan_index} 步`, 'text-orange-400'],
+                      ['操作类型', typeLabel, stepColor.text],
+                      ['操作', STAGE_NAMES[selected.next_scan_index], stepColor.text],
+                    ].map(([k, v, color], i) => (
+                      <div key={i} className="flex justify-between">
+                        <span className="text-slate-500">{k}</span>
+                        <span className={cn('text-xs', color || 'text-slate-300')}>{v}</span>
+                      </div>
+                    ))}
+                    {selected.prev_weight !== null && (
+                      <div className="flex justify-between pt-2 border-t border-white/5">
+                        <span className="text-slate-500">上次称重</span>
+                        <span className="text-slate-300">{selected.prev_weight} kg</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-              <div className="space-y-2.5 text-sm">
-                {[
-                  ['订单号', selected.order_no],
-                  ['产品', `${selected.product_model} · ${selected.customer_name}`],
-                  ['当前工序', `第 ${selected.next_scan_index} 步`],
-                  ['操作', STAGE_NAMES[selected.next_scan_index]],
-                ].map(([k, v], i) => (
-                  <div key={i} className="flex justify-between">
-                    <span className="text-slate-500">{k}</span>
-                    <span className={cn(
-                      'text-xs',
-                      k === '当前工序' ? 'text-orange-400' : 'text-slate-300'
-                    )}>{v}</span>
-                  </div>
-                ))}
-                {selected.prev_weight !== null && (
-                  <div className="flex justify-between pt-2 border-t border-white/5">
-                    <span className="text-slate-500">上次称重</span>
-                    <span className="text-slate-300">{selected.prev_weight} kg</span>
-                  </div>
-                )}
-              </div>
-            </div>
+              )
+            })()}
             <div className="flex gap-3">
               <button onClick={handleReset}
                 className="flex-1 py-3.5 rounded-xl border border-white/10 text-slate-400 text-sm hover:bg-white/5 transition-all">
