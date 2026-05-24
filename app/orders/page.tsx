@@ -21,7 +21,7 @@ type Order = {
   status: string
   is_urgent: boolean
   created_at: string
-  order_progress: { current_stage: number } | null
+  order_progress: { current_stage: number }[] | null
 }
 
 const emptyForm = {
@@ -93,6 +93,66 @@ function SpecCombobox({
           {filtered.length > 80 && (
             <div className="px-3 py-2 text-xs text-slate-600">还有 {filtered.length - 80} 个，继续输入缩小范围</div>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CustomerCombobox({
+  value,
+  onChange,
+  allOrders,
+}: {
+  value: string
+  onChange: (v: string) => void
+  allOrders: Order[]
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState(value)
+  const ref = useRef<HTMLDivElement>(null)
+
+  const customers = Array.from(new Set(allOrders.map(o => o.customer_name).filter(Boolean)))
+  const filtered = query
+    ? customers.filter(c => c.toLowerCase().includes(query.toLowerCase()))
+    : customers
+
+  useEffect(() => { setQuery(value) }, [value])
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <input
+          value={query}
+          onChange={e => { setQuery(e.target.value); onChange(e.target.value); setOpen(true) }}
+          onFocus={() => setOpen(true)}
+          placeholder="如：杰克科技"
+          className="w-full px-3 py-2 pr-8 text-sm bg-[#0d1117] border border-white/8 rounded-lg text-slate-300 placeholder-slate-700 focus:outline-none focus:border-orange-500/50"
+        />
+        <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
+      </div>
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 top-full mt-1 w-full max-h-40 overflow-y-auto bg-[#1c2128] border border-white/10 rounded-xl shadow-2xl">
+          {filtered.map((c, i) => (
+            <button
+              key={i}
+              type="button"
+              onMouseDown={() => { onChange(c); setQuery(c); setOpen(false) }}
+              className={cn(
+                'w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-orange-500/10 hover:text-orange-300 transition-colors',
+                value === c && 'bg-orange-500/10 text-orange-400'
+              )}>
+              {c}
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -312,11 +372,10 @@ export default function OrdersPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-slate-500 mb-1 block">客户名称 *</label>
-                  <input
-                    placeholder="如：杰克科技"
+                  <CustomerCombobox
                     value={form.customer_name}
-                    onChange={e => setForm(p => ({ ...p, customer_name: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm bg-[#0d1117] border border-white/8 rounded-lg text-slate-300 placeholder-slate-700 focus:outline-none focus:border-orange-500/50"
+                    onChange={v => setForm(p => ({ ...p, customer_name: v }))}
+                    allOrders={orders}
                   />
                 </div>
                 <div>
@@ -500,7 +559,7 @@ export default function OrdersPage() {
                 const s = STATUS_LABELS[o.status] ?? { label: o.status, color: 'text-slate-400 bg-slate-400/10' }
                 const amount = o.quantity * o.unit_price
                 const daysLeft = Math.ceil((new Date(o.delivery_date).getTime() - Date.now()) / 86400000)
-                const stage = o.order_progress?.current_stage ?? 0
+                const stage = o.order_progress?.[0]?.current_stage ?? 0
                 return (
                   <tr key={o.id} className={cn(
                     'border-b border-white/3 hover:bg-white/2 transition-colors',
