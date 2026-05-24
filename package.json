@@ -11,8 +11,10 @@
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
+    "@types/bcryptjs": "^2.4.6",
     "@types/md5": "^2.3.6",
     "@types/qrcode": "^1.5.6",
+    "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "echarts": "^6.0.0",
     "echarts-for-react": "^3.0.6",

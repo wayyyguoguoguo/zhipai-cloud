@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Settings, Factory, AlertTriangle, Users, Save, RotateCcw, Check } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { resetPinToDefault } from '@/lib/worker-auth'
 
 const SETTINGS_KEY = 'zhipai_settings'
 
@@ -64,13 +65,9 @@ export default function SettingsPage() {
     if (!resetTarget) return
     setResetting(true)
     setResetDone('')
-    const md5 = (await import('md5')).default
-    const { error } = await supabase
-      .from('worker_profiles')
-      .update({ pin_hash: md5('0000') })
-      .eq('worker_no', resetTarget.toUpperCase())
+    const result = await resetPinToDefault(resetTarget)
     setResetting(false)
-    setResetDone(error ? '重置失败：' + error.message : `${resetTarget.toUpperCase()} PIN已重置为 0000`)
+    setResetDone(result.error ? '重置失败：' + result.error : `${resetTarget.toUpperCase()} PIN已重置为 0000（下次登录需重新设置）`)
     setResetTarget('')
   }
 

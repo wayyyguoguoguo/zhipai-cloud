@@ -3,11 +3,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { cn, STAGE_NAMES, ROLE_LABELS } from '@/lib/utils'
 import {
-  getStoredWorker, storeWorker, clearWorker, loginWorker,
+  getStoredWorker, storeWorker, clearWorker, loginWorker, changePin,
   type WorkerProfile
 } from '@/lib/worker-auth'
 import { supabase } from '@/lib/supabase'
-import { CheckCircle2, Scale, AlertCircle, ChevronRight, LogOut, RefreshCw } from 'lucide-react'
+import { CheckCircle2, Scale, AlertCircle, ChevronRight, LogOut, RefreshCw, KeyRound } from 'lucide-react'
 
 // 每个 role_type 对应哪些 scan_index 是该角色操作的
 const ROLE_SCAN_INDEXES: Record<string, number[]> = {
@@ -73,6 +73,12 @@ export default function WorkerPage() {
   const [loginPin, setLoginPin] = useState('')
   const [loginError, setLoginError] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
+
+  // 改 PIN 相关
+  const [newPin, setNewPin] = useState('')
+  const [newPinConfirm, setNewPinConfirm] = useState('')
+  const [changePinError, setChangePinError] = useState('')
+  const [changePinLoading, setChangePinLoading] = useState(false)
 
   const [batches, setBatches] = useState<PendingBatch[]>([])
   const [loadingBatches, setLoadingBatches] = useState(false)
@@ -187,6 +193,23 @@ export default function WorkerPage() {
       setLoginError(result.error)
     } else {
       setWorker(result.worker)
+    }
+  }
+
+  async function handleChangePin() {
+    if (newPin.length !== 4) { setChangePinError('PIN 必须是4位数字'); return }
+    if (newPin !== newPinConfirm) { setChangePinError('两次输入不一致'); return }
+    if (!worker) return
+    setChangePinLoading(true)
+    setChangePinError('')
+    const result = await changePin(worker.id, newPin)
+    setChangePinLoading(false)
+    if (result.error) {
+      setChangePinError('修改失败：' + result.error)
+    } else {
+      setWorker(prev => prev ? { ...prev, pin_changed: true } : null)
+      setNewPin('')
+      setNewPinConfirm('')
     }
   }
 
@@ -329,6 +352,61 @@ export default function WorkerPage() {
             {loginLoading ? '验证中...' : '登录'}
           </button>
           <p className="text-xs text-slate-600 text-center">初始PIN：0000，请联系管理员修改</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── 首次登录：强制改 PIN ──
+  if (worker && !worker.pin_changed) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6"
+          style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+          <KeyRound className="text-white" size={20} />
+        </div>
+        <h1 className="text-xl font-bold text-slate-100 mb-1">设置新 PIN 码</h1>
+        <p className="text-sm text-slate-500 mb-2 text-center">首次登录需修改初始 PIN，请设置一个只有你知道的4位数字</p>
+        <p className="text-xs text-slate-600 mb-8">当前工号：{worker.worker_no} · {worker.display_name}</p>
+
+        <div className="w-full max-w-xs space-y-4">
+          <div>
+            <label className="text-xs text-slate-500 mb-1.5 block">新 PIN 码（4位数字）</label>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="••••"
+              value={newPin}
+              onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              className="w-full px-4 py-3 text-base bg-[#161b22] border border-white/10 rounded-xl text-slate-200 placeholder-slate-600 focus:outline-none focus:border-orange-500/60 tracking-widest text-center text-2xl"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 mb-1.5 block">确认新 PIN 码</label>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="••••"
+              value={newPinConfirm}
+              onChange={e => setNewPinConfirm(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              className="w-full px-4 py-3 text-base bg-[#161b22] border border-white/10 rounded-xl text-slate-200 placeholder-slate-600 focus:outline-none focus:border-orange-500/60 tracking-widest text-center text-2xl"
+            />
+          </div>
+          {changePinError && <p className="text-xs text-red-400 text-center">{changePinError}</p>}
+          <button
+            onClick={handleChangePin}
+            disabled={changePinLoading || newPin.length < 4 || newPinConfirm.length < 4}
+            className="w-full py-3.5 rounded-xl text-white font-medium text-base transition-all disabled:opacity-40"
+            style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+            {changePinLoading ? '保存中...' : '确认设置'}
+          </button>
+          <button
+            onClick={() => { clearWorker(); setWorker(null) }}
+            className="w-full py-2 text-xs text-slate-600 hover:text-slate-400 transition-colors">
+            退出登录
+          </button>
         </div>
       </div>
     )
