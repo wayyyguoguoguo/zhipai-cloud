@@ -11,7 +11,7 @@ import { CheckCircle2, Scale, AlertCircle, ChevronRight, LogOut, RefreshCw } fro
 
 // 每个 role_type 对应哪些 scan_index 是该角色操作的
 const ROLE_SCAN_INDEXES: Record<string, number[]> = {
-  weigher:      [1, 4, 7, 10, 13, 14],
+  weigher:      [1, 4, 7, 10],
   metal_worker: [2, 3],
   heat_worker:  [5, 6],
   grinder:      [8, 9],
@@ -205,7 +205,8 @@ export default function WorkerPage() {
     } else if (selected.next_scan_index === 13) {
       setStep('qty')
     } else {
-      setStep('weigh')
+      // 收料/完成/出库：直接提交，不需要录入数据
+      handleSubmit()
     }
   }
 

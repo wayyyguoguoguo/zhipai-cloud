@@ -34,11 +34,11 @@ const STAGE_GROUPS: Record<number, string> = {
   1: '原料入库', 2: '五金加工', 3: '五金加工',
   4: '称重', 5: '热处理', 6: '热处理',
   7: '称重', 8: '磨床', 9: '磨床',
-  10: '称重', 11: '校直检验', 12: '清洗',
+  10: '称重', 11: '校直检验', 12: '检验',
   13: '待出库', 14: '待出库',
 }
 
-const STAGE_DISPLAY = ['原料入库', '五金加工', '热处理', '磨床', '校直检验', '清洗', '待出库']
+const STAGE_DISPLAY = ['原料入库', '五金加工', '热处理', '磨床', '校直检验', '检验', '待出库']
 
 export default function DashboardPage() {
   const [orders, setOrders] = useState<Order[]>([])
