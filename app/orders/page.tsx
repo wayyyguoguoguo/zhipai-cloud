@@ -176,7 +176,7 @@ export default function OrdersPage() {
     fetchOrders()
 
     const channel = supabase
-      .channel('orders-realtime')
+      .channel(`orders-realtime-${tenantId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchOrders)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_progress' }, fetchOrders)
       .subscribe()
