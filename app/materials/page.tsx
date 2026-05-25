@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { cn, INBOUND_STATUS_LABELS } from '@/lib/utils'
 import { ChevronDown, X, Link2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useTenant } from '@/lib/tenant-context'
 
 type Batch = {
   id: string
@@ -30,10 +31,12 @@ type OrderOption = {
 
 function AllocateModal({
   batch,
+  tenantId,
   onClose,
   onDone,
 }: {
   batch: Batch
+  tenantId: string
   onClose: () => void
   onDone: () => void
 }) {
@@ -47,10 +50,11 @@ function AllocateModal({
     supabase
       .from('orders')
       .select('id, order_no, customer_name, product_model, quantity')
+      .eq('tenant_id', tenantId)
       .in('status', ['waiting_material', 'in_production', 'pending'])
       .order('created_at', { ascending: false })
       .then(({ data }) => setOrders(data ?? []))
-  }, [])
+  }, [tenantId])
 
   async function handleSubmit() {
     if (!selectedOrderId || !allocWeight) return
@@ -64,6 +68,7 @@ function AllocateModal({
       batch_id: batch.id,
       order_id: selectedOrderId,
       allocated_weight: w,
+      tenant_id: tenantId,
     })
 
     if (insertErr) {
@@ -356,8 +361,10 @@ export default function MaterialsPage() {
   const [loading, setLoading] = useState(true)
   const [allocBatch, setAllocBatch] = useState<Batch | null>(null)
   const [editBatch, setEditBatch] = useState<Batch | null>(null)
+  const tenantId = useTenant()
 
   useEffect(() => {
+    if (!tenantId) return
     fetchBatches()
 
     const channel = supabase.channel('materials-realtime')
@@ -365,12 +372,13 @@ export default function MaterialsPage() {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [tenantId])
 
   async function fetchBatches() {
     const { data, error } = await supabase
       .from('material_batches')
       .select('*, orders(order_no)')
+      .eq('tenant_id', tenantId)
       .order('inbound_date', { ascending: false })
 
     if (!error && data) setBatches(data)
@@ -378,10 +386,9 @@ export default function MaterialsPage() {
   }
 
   async function handleStatusChange(batchId: string, newStatus: string) {
-    await supabase.from('material_batches').update({ inbound_status: newStatus }).eq('id', batchId)
+    await supabase.from('material_batches').update({ inbound_status: newStatus }).eq('id', batchId).eq('tenant_id', tenantId)
     setBatches(prev => prev.map(b => b.id === batchId ? { ...b, inbound_status: newStatus } : b))
 
-    // 原料已入库 → 关联订单进入生产中
     if (newStatus === 'inbound') {
       const batch = batches.find(b => b.id === batchId)
       if (batch?.order_id) {
@@ -389,6 +396,7 @@ export default function MaterialsPage() {
           .from('orders')
           .update({ status: 'in_production' })
           .eq('id', batch.order_id)
+          .eq('tenant_id', tenantId)
           .eq('status', 'pending')
       }
     }
@@ -399,6 +407,7 @@ export default function MaterialsPage() {
       {allocBatch && (
         <AllocateModal
           batch={allocBatch}
+          tenantId={tenantId}
           onClose={() => setAllocBatch(null)}
           onDone={() => { setAllocBatch(null); fetchBatches() }}
         />

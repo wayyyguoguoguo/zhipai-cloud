@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { cn, STATUS_LABELS } from '@/lib/utils'
 import { Plus, Search, X, ChevronDown } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useTenant } from '@/lib/tenant-context'
 import PRODUCT_SPECS from '@/lib/product_specs.json'
 
 const PRODUCT_MODELS = ['上轴', '下轴', '针杆', '压杆', '送料轴', '抬牙轴', '立轴', '小产品']
@@ -168,8 +169,10 @@ export default function OrdersPage() {
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const tenantId = useTenant()
 
   useEffect(() => {
+    if (!tenantId) return
     fetchOrders()
 
     const channel = supabase
@@ -179,12 +182,13 @@ export default function OrdersPage() {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [tenantId])
 
   async function fetchOrders() {
     const { data, error } = await supabase
       .from('orders')
       .select('*, order_progress(current_stage)')
+      .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
 
     if (!error && data) setOrders(data)
@@ -197,6 +201,7 @@ export default function OrdersPage() {
     const { count } = await supabase
       .from('orders')
       .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
       .like('order_no', `${prefix}%`)
     return `${prefix}${String((count ?? 0) + 1).padStart(3, '0')}`
   }
@@ -207,6 +212,7 @@ export default function OrdersPage() {
     const { count } = await supabase
       .from('material_batches')
       .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
       .like('batch_no', `${prefix}%`)
     return `${prefix}${String((count ?? 0) + 1).padStart(4, '0')}`
   }
@@ -285,6 +291,7 @@ export default function OrdersPage() {
           delivery_date: form.delivery_date,
           status: 'pending',
           is_urgent: form.is_urgent,
+          tenant_id: tenantId,
         })
         .select()
         .single()
@@ -299,6 +306,7 @@ export default function OrdersPage() {
         order_id: orderData.id,
         current_stage: 0,
         current_stage_name: '待接单',
+        tenant_id: tenantId,
       })
 
       // 自动生成原料批次
@@ -314,6 +322,7 @@ export default function OrdersPage() {
           inbound_status: 'pending_purchase',
           status: 'in_stock',
           inbound_date: new Date().toISOString().slice(0, 10),
+          tenant_id: tenantId,
         })
         .select()
         .single()
@@ -328,6 +337,7 @@ export default function OrdersPage() {
         batch_id: batchData.id,
         order_id: orderData.id,
         allocated_weight: materialWeight,
+        tenant_id: tenantId,
       })
     }
 

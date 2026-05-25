@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { Settings, Factory, AlertTriangle, Users, Save, RotateCcw, Check } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { resetPinToDefault } from '@/lib/worker-auth'
+import { useTenant } from '@/lib/tenant-context'
 
 const SETTINGS_KEY = 'zhipai_settings'
 
@@ -44,16 +45,19 @@ export default function SettingsPage() {
   const [resetTarget, setResetTarget] = useState('')
   const [resetting, setResetting] = useState(false)
   const [resetDone, setResetDone] = useState('')
+  const tenantId = useTenant()
 
   useEffect(() => {
     setSettings(loadSettings())
+    if (!tenantId) return
     supabase
       .from('worker_profiles')
       .select('id, worker_no, display_name, role_type')
+      .eq('tenant_id', tenantId)
       .eq('is_active', true)
       .order('worker_no')
       .then(({ data }) => setWorkers(data ?? []))
-  }, [])
+  }, [tenantId])
 
   function handleSave() {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
@@ -65,7 +69,7 @@ export default function SettingsPage() {
     if (!resetTarget) return
     setResetting(true)
     setResetDone('')
-    const result = await resetPinToDefault(resetTarget)
+    const result = await resetPinToDefault(resetTarget, tenantId)
     setResetting(false)
     setResetDone(result.error ? '重置失败：' + result.error : `${resetTarget.toUpperCase()} PIN已重置为 0000（下次登录需重新设置）`)
     setResetTarget('')

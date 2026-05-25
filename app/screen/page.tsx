@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { Activity, AlertTriangle, TrendingUp, Package, Clock, Zap } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useTenant } from '@/lib/tenant-context'
 
 const PRODUCT_LINES = ['上轴', '下轴', '抬牙轴', '送料轴', '压杆', '针杆', '小产品']
 
@@ -79,6 +80,7 @@ export default function ScreenPage() {
   const [orders, setOrders] = useState<OrderRow[]>([])
   const [transfers, setTransfers] = useState<TransferRow[]>([])
   const [anomalies, setAnomalies] = useState<AnomalyRow[]>([])
+  const tenantId = useTenant()
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000)
@@ -86,6 +88,7 @@ export default function ScreenPage() {
   }, [])
 
   const fetchAll = useCallback(async () => {
+    if (!tenantId) return
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const sevenDaysAgo = new Date(today)
@@ -95,15 +98,18 @@ export default function ScreenPage() {
       supabase
         .from('orders')
         .select('id, status, product_model, quantity, unit_price, created_at, is_urgent, order_progress(current_stage)')
+        .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false }),
       supabase
         .from('process_transfers')
         .select('id, created_at, stage_name, weight_in, scrap_rate, scan_index, orders(product_model, order_no), worker_profiles:worker_id(display_name)')
+        .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false })
         .limit(20),
       supabase
         .from('anomalies')
         .select('id, description, severity, created_at')
+        .eq('tenant_id', tenantId)
         .eq('is_resolved', false)
         .order('created_at', { ascending: false })
         .limit(6),
@@ -112,9 +118,10 @@ export default function ScreenPage() {
     if (ordersRes.data) setOrders(ordersRes.data as OrderRow[])
     if (transfersRes.data) setTransfers(transfersRes.data as unknown as TransferRow[])
     if (anomaliesRes.data) setAnomalies(anomaliesRes.data)
-  }, [])
+  }, [tenantId])
 
   useEffect(() => {
+    if (!tenantId) return
     fetchAll()
     const ch = supabase.channel('screen-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchAll)
@@ -122,7 +129,7 @@ export default function ScreenPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'anomalies' }, fetchAll)
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [fetchAll])
+  }, [fetchAll, tenantId])
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)

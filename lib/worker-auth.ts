@@ -51,14 +51,16 @@ export function clearWorker() {
 
 export async function loginWorker(
   workerNo: string,
-  pin: string
+  pin: string,
+  tenantId?: string
 ): Promise<{ worker: WorkerProfile } | { error: string }> {
-  const { data, error } = await supabase
+  let query = supabase
     .from('worker_profiles')
     .select('id, worker_no, display_name, role_type, product_line, is_active, pin_hash, pin_changed, login_attempts, locked_until')
     .eq('worker_no', workerNo.toUpperCase())
     .eq('is_active', true)
-    .single()
+  if (tenantId) query = query.eq('tenant_id', tenantId)
+  const { data, error } = await query.single()
 
   if (error || !data) return { error: '工号不存在或已停用' }
 
@@ -127,12 +129,14 @@ export async function changePin(
   return {}
 }
 
-export async function resetPinToDefault(workerNo: string): Promise<{ error?: string }> {
+export async function resetPinToDefault(workerNo: string, tenantId?: string): Promise<{ error?: string }> {
   const hash = await bcrypt.hash('0000', 10)
-  const { error } = await supabase
+  let query = supabase
     .from('worker_profiles')
     .update({ pin_hash: hash, pin_changed: false, login_attempts: 0, locked_until: null })
     .eq('worker_no', workerNo.toUpperCase())
+  if (tenantId) query = query.eq('tenant_id', tenantId)
+  const { error } = await query
   if (error) return { error: error.message }
   return {}
 }

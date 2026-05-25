@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { cn, STAGE_NAMES, STATUS_LABELS } from '@/lib/utils'
 import { CheckCircle2, Clock, AlertTriangle, Package, ArrowLeft, Search } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useTenant } from '@/lib/tenant-context'
 
 type Order = {
   id: string
@@ -59,6 +60,7 @@ type OrderListItem = {
 function TrackingContent() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('id')
+  const tenantId = useTenant()
 
   // ── 无 id：显示在产订单列表 ──────────────────────────────────────
   const [orderList, setOrderList] = useState<OrderListItem[]>([])
@@ -66,11 +68,12 @@ function TrackingContent() {
   const [listSearch, setListSearch] = useState('')
 
   useEffect(() => {
-    if (orderId) return
+    if (orderId || !tenantId) return
     setListLoading(true)
     supabase
       .from('orders')
       .select('id, order_no, customer_name, product_model, quantity, status, is_urgent, delivery_date, order_progress(current_stage)')
+      .eq('tenant_id', tenantId)
       .in('status', ['pending', 'in_production'])
       .order('is_urgent', { ascending: false })
       .order('delivery_date', { ascending: true })
@@ -78,7 +81,7 @@ function TrackingContent() {
         setOrderList(data ?? [])
         setListLoading(false)
       })
-  }, [orderId])
+  }, [orderId, tenantId])
 
   const [order, setOrder] = useState<Order | null>(null)
   const [progress, setProgress] = useState<OrderProgress | null>(null)
@@ -87,7 +90,7 @@ function TrackingContent() {
   const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
-    if (!orderId) return
+    if (!orderId || !tenantId) return
     fetchData()
 
     const channel = supabase.channel(`tracking-${orderId}`)
@@ -100,11 +103,12 @@ function TrackingContent() {
 
   async function fetchData() {
     const [orderRes, progressRes, transfersRes] = await Promise.all([
-      supabase.from('orders').select('*').eq('id', orderId!).single(),
-      supabase.from('order_progress').select('*').eq('order_id', orderId!).single(),
+      supabase.from('orders').select('*').eq('id', orderId!).eq('tenant_id', tenantId).single(),
+      supabase.from('order_progress').select('*').eq('order_id', orderId!).eq('tenant_id', tenantId).single(),
       supabase.from('process_transfers')
         .select('scan_index, weight_in, created_at')
         .eq('order_id', orderId!)
+        .eq('tenant_id', tenantId)
         .in('scan_index', WEIGH_STAGES)
         .order('scan_index', { ascending: true }),
     ])

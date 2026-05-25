@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { cn, STAGE_NAMES, ROLE_LABELS } from '@/lib/utils'
 import {
   getStoredWorker, storeWorker, clearWorker, loginWorker, changePin,
@@ -67,7 +68,9 @@ type PendingBatch = {
 
 type Step = 'list' | 'confirm' | 'weigh' | 'qty' | 'done'
 
-export default function WorkerPage() {
+function WorkerContent() {
+  const searchParams = useSearchParams()
+  const tenantId = searchParams.get('t') ?? 'gege'
   const [worker, setWorker] = useState<WorkerProfile | null>(null)
   const [loginNo, setLoginNo] = useState('')
   const [loginPin, setLoginPin] = useState('')
@@ -99,10 +102,10 @@ export default function WorkerPage() {
     const allowedIndexes = ROLE_SCAN_INDEXES[w.role_type] ?? []
     if (allowedIndexes.length === 0) { setLoadingBatches(false); return }
 
-    // 查询 order_progress，找到 current_stage+1 在该角色操作范围内的订单
     const { data: progressRows } = await supabase
       .from('order_progress')
       .select('order_id, current_stage')
+      .eq('tenant_id', tenantId)
       .in('current_stage', allowedIndexes.map(i => i - 1))
 
     if (!progressRows || progressRows.length === 0) {
@@ -115,6 +118,7 @@ export default function WorkerPage() {
     const { data: orders } = await supabase
       .from('orders')
       .select('id, order_no, product_model, customer_name, is_urgent')
+      .eq('tenant_id', tenantId)
       .in('id', orderIds)
       .in('status', ['pending', 'in_production'])
 
@@ -144,6 +148,7 @@ export default function WorkerPage() {
           .from('process_transfers')
           .select('weight_in')
           .eq('order_id', order.id)
+          .eq('tenant_id', tenantId)
           .eq('scan_index', lastWeighIdx)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -156,6 +161,7 @@ export default function WorkerPage() {
         .from('material_allocations')
         .select('batch_id, material_batches(batch_no)')
         .eq('order_id', order.id)
+        .eq('tenant_id', tenantId)
         .limit(1)
         .single()
 
@@ -187,7 +193,7 @@ export default function WorkerPage() {
     if (!loginNo || !loginPin) return
     setLoginLoading(true)
     setLoginError('')
-    const result = await loginWorker(loginNo, loginPin)
+    const result = await loginWorker(loginNo, loginPin, tenantId)
     setLoginLoading(false)
     if ('error' in result) {
       setLoginError(result.error)
@@ -260,6 +266,7 @@ export default function WorkerPage() {
       qty_in: isWarehouseIn && qty ? parseInt(qty) : null,
       action: actionMap[selected.next_scan_index] ?? 'complete',
       is_confirmed: true,
+      tenant_id: tenantId,
     }
 
     const { error: transferError } = await supabase
@@ -284,6 +291,7 @@ export default function WorkerPage() {
         ...(newStage === 14 ? { completed_at: new Date().toISOString() } : {}),
       })
       .eq('order_id', selected.order_id)
+      .eq('tenant_id', tenantId)
 
     if (progressError) {
       setSubmitError('进度更新失败：' + progressError.message)
@@ -293,7 +301,7 @@ export default function WorkerPage() {
 
     // 如果是出库（14），更新订单状态为 completed
     if (newStage === 14) {
-      await supabase.from('orders').update({ status: 'completed' }).eq('id', selected.order_id)
+      await supabase.from('orders').update({ status: 'completed' }).eq('id', selected.order_id).eq('tenant_id', tenantId)
     }
 
     setSubmitting(false)
@@ -699,5 +707,17 @@ export default function WorkerPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function WorkerPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-slate-600 border-t-orange-400 rounded-full animate-spin" />
+      </div>
+    }>
+      <WorkerContent />
+    </Suspense>
   )
 }

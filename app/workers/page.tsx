@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { cn, ROLE_LABELS } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+import { useTenant } from '@/lib/tenant-context'
 import { Users, QrCode, TrendingUp, Package, Clock, ChevronDown, ChevronUp } from 'lucide-react'
 
 type WorkerProfile = {
@@ -26,10 +27,10 @@ type WorkerStat = {
 
 const ROLE_ORDER = ['weigher', 'metal_worker', 'heat_worker', 'grinder', 'straightener', 'inspector', 'warehouse', 'admin']
 
-function QRModal({ workerNo, name, onClose }: { workerNo: string; name: string; onClose: () => void }) {
+function QRModal({ workerNo, name, tenantId, onClose }: { workerNo: string; name: string; tenantId: string; onClose: () => void }) {
   const url = typeof window !== 'undefined'
-    ? `${window.location.origin}/w?worker=${workerNo}`
-    : `/w?worker=${workerNo}`
+    ? `${window.location.origin}/w?worker=${workerNo}&t=${tenantId}`
+    : `/w?worker=${workerNo}&t=${tenantId}`
 
   useEffect(() => {
     // 动态加载 qrcode 库生成二维码
@@ -80,22 +81,24 @@ export default function WorkersPage() {
   const [qrWorker, setQrWorker] = useState<{ no: string; name: string } | null>(null)
   const [expandedRole, setExpandedRole] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState<'today' | 'week'>('today')
+  const tenantId = useTenant()
 
   useEffect(() => {
+    if (!tenantId) return
     fetchAll()
-  }, [])
+  }, [tenantId])
 
   async function fetchAll() {
     setLoading(true)
     const { data: workerData } = await supabase
       .from('worker_profiles')
       .select('id, worker_no, display_name, role_type, product_line, is_active, last_login')
+      .eq('tenant_id', tenantId)
       .order('worker_no')
 
     if (!workerData) { setLoading(false); return }
     setWorkers(workerData)
 
-    // 查今日和本周的 process_transfers 统计
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
     const weekStart = new Date()
@@ -105,6 +108,7 @@ export default function WorkersPage() {
     const { data: transfers } = await supabase
       .from('process_transfers')
       .select('worker_id, weight_in, created_at, order_id')
+      .eq('tenant_id', tenantId)
       .gte('created_at', weekStart.toISOString())
 
     const statMap: Record<string, WorkerStat> = {}
@@ -178,7 +182,7 @@ export default function WorkersPage() {
   return (
     <div className="p-6 space-y-5">
       {qrWorker && (
-        <QRModal workerNo={qrWorker.no} name={qrWorker.name} onClose={() => setQrWorker(null)} />
+        <QRModal workerNo={qrWorker.no} name={qrWorker.name} tenantId={tenantId} onClose={() => setQrWorker(null)} />
       )}
 
       <div className="flex items-center justify-between">

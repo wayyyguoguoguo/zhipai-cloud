@@ -7,6 +7,7 @@ import {
   ClipboardList, Activity, ArrowRight, Clock
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useTenant } from '@/lib/tenant-context'
 
 type Order = {
   id: string
@@ -44,9 +45,11 @@ export default function DashboardPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [anomalies, setAnomalies] = useState<Anomaly[]>([])
   const [loading, setLoading] = useState(true)
+  const tenantId = useTenant()
   const today = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
 
   useEffect(() => {
+    if (!tenantId) return
     fetchAll()
 
     const ch1 = supabase.channel('dash-orders')
@@ -60,12 +63,12 @@ export default function DashboardPage() {
       supabase.removeChannel(ch1)
       supabase.removeChannel(ch2)
     }
-  }, [])
+  }, [tenantId])
 
   async function fetchAll() {
     const [ordersRes, anomaliesRes] = await Promise.all([
-      supabase.from('orders').select('*, order_progress(current_stage)').order('created_at', { ascending: false }),
-      supabase.from('anomalies').select('*').eq('is_resolved', false).order('created_at', { ascending: false }).limit(6),
+      supabase.from('orders').select('*, order_progress(current_stage)').eq('tenant_id', tenantId).order('created_at', { ascending: false }),
+      supabase.from('anomalies').select('*').eq('tenant_id', tenantId).eq('is_resolved', false).order('created_at', { ascending: false }).limit(6),
     ])
     if (!ordersRes.error && ordersRes.data) setOrders(ordersRes.data)
     if (!anomaliesRes.error && anomaliesRes.data) setAnomalies(anomaliesRes.data)
@@ -300,7 +303,7 @@ export default function DashboardPage() {
                 </div>
                 <button
                   onClick={async () => {
-                    await supabase.from('anomalies').update({ is_resolved: true }).eq('id', a.id)
+                    await supabase.from('anomalies').update({ is_resolved: true }).eq('id', a.id).eq('tenant_id', tenantId)
                   }}
                   className="text-xs text-slate-600 hover:text-slate-400 shrink-0">
                   处理

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import {
@@ -13,27 +13,40 @@ import {
   Monitor,
   Settings,
   Factory,
+  LogOut,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useTenant } from '@/lib/tenant-context'
+import { adminLogout, getAdminSession } from '@/lib/admin-auth'
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const tenantId = useTenant()
   const [pendingCount, setPendingCount] = useState(0)
+  const session = getAdminSession()
 
   useEffect(() => {
+    if (!tenantId) return
     fetchCount()
     const ch = supabase.channel('sidebar-materials')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'material_batches' }, fetchCount)
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [])
+  }, [tenantId])
 
   async function fetchCount() {
     const { count } = await supabase
       .from('material_batches')
       .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
       .neq('inbound_status', 'inbound')
     setPendingCount(count ?? 0)
+  }
+
+  async function handleLogout() {
+    await adminLogout()
+    router.replace('/login')
   }
 
   const navItems = [
@@ -86,12 +99,28 @@ export default function Sidebar() {
       </nav>
 
       {/* Bottom */}
-      <div className="mt-auto px-2 w-full">
+      <div className="mt-auto px-2 w-full flex flex-col gap-1">
+        {session && (
+          <div className="flex flex-col items-center gap-0.5 py-2 px-1">
+            <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-400 text-[10px] font-bold">
+              {session.displayName?.[0] ?? '?'}
+            </div>
+            <span className="text-[8px] text-slate-600 text-center leading-tight max-w-full truncate">
+              {session.tenantId === 'gege' ? '哥哥' : '演示'}
+            </span>
+          </div>
+        )}
         <Link href="/settings"
           className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-slate-600 hover:text-slate-400 hover:bg-white/5 transition-all">
           <Settings size={18} />
           <span className="text-[9px]">设置</span>
         </Link>
+        <button
+          onClick={handleLogout}
+          className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/5 transition-all w-full">
+          <LogOut size={18} />
+          <span className="text-[9px]">退出</span>
+        </button>
       </div>
     </aside>
   )
