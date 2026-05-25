@@ -466,7 +466,7 @@ export default function OrdersPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-slate-500 mb-1 block">订单号（自动生成）</label>
-                  <div className="px-3 py-2 text-sm bg-[#0d1117] border border-white/5 rounded-lg text-slate-600 font-mono">
+                  <div className="px-3 py-2 text-sm bg-[#0d1117] border border-white/5 rounded-lg text-slate-600 font-mono" suppressHydrationWarning>
                     ORD-{new Date().toISOString().slice(0,10).replace(/-/g,'')}-XXX
                   </div>
                 </div>
