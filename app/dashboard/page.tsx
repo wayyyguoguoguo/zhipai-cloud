@@ -52,10 +52,10 @@ export default function DashboardPage() {
     if (!tenantId) return
     fetchAll()
 
-    const ch1 = supabase.channel('dash-orders')
+    const ch1 = supabase.channel(`dash-orders-${tenantId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchAll)
       .subscribe()
-    const ch2 = supabase.channel('dash-anomalies')
+    const ch2 = supabase.channel(`dash-anomalies-${tenantId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'anomalies' }, fetchAll)
       .subscribe()
 

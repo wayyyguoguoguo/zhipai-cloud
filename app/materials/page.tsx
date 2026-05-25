@@ -367,7 +367,7 @@ export default function MaterialsPage() {
     if (!tenantId) return
     fetchBatches()
 
-    const channel = supabase.channel('materials-realtime')
+    const channel = supabase.channel(`materials-realtime-${tenantId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'material_batches' }, fetchBatches)
       .subscribe()
 

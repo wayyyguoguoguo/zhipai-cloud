@@ -123,7 +123,7 @@ export default function ScreenPage() {
   useEffect(() => {
     if (!tenantId) return
     fetchAll()
-    const ch = supabase.channel('screen-realtime')
+    const ch = supabase.channel(`screen-realtime-${tenantId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchAll)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'process_transfers' }, fetchAll)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'anomalies' }, fetchAll)
